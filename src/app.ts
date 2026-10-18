@@ -3,31 +3,48 @@ import pool from "./db/index.ts";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import "dotenv/config";
+import cors from "cors";
 import { authMiddleware } from "./middlewares/authMiddleware.ts";
 import { adminMiddleware } from "./middlewares/adminMiddleware.ts";
 import type { AuthRequest } from "./middlewares/authMiddleware.ts";
 import { uploadToCloudinary } from "./db/cloudinary.ts";
-import { deleteUser, editProfile, getAllUsers, login, register, } from "./controllers/userController.ts";
-import { deleteTabungan, detailTabungan, editTabungan, getAllTabungan, newTabungan } from "./controllers/nabungController.ts";
-import { historyTransaksi, newTransaksi } from "./controllers/transaksiController.ts";
+import {
+  deleteUser,
+  editProfile,
+  getAllUsers,
+  login,
+  register,
+} from "./controllers/userController.ts";
+import {
+  deleteTabungan,
+  detailTabungan,
+  editTabungan,
+  getAllTabungan,
+  newTabungan,
+} from "./controllers/nabungController.ts";
+import {
+  historyTransaksi,
+  newTransaksi,
+} from "./controllers/transaksiController.ts";
 
 const app: Express = express();
 const port = process.env.PORT;
 
+app.use(cors({ origin: process.env.FRONTEND_URL }));
+app.use(express.json());
 app.use(express.json());
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 4 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("image/")) cb(null, true);
     else cb(new Error("Hanya file gambar yang diperbolehkan!"));
   },
 });
 
-
 // ini buat register
-app.post("/api/register", register );
+app.post("/api/register", register);
 
 // ini buat login
 app.post("/api/login", login);
@@ -39,7 +56,12 @@ app.get("/api/users", authMiddleware, getAllUsers);
 app.delete("/api/users/:id", authMiddleware, adminMiddleware, deleteUser);
 
 // edit profil user (username, email, password) - hanya diri sendiri atau admin
-app.put("/api/users/profile", authMiddleware, upload.single("image"), editProfile);
+app.put(
+  "/api/users/profile",
+  authMiddleware,
+  upload.single("image"),
+  editProfile,
+);
 
 // =====================================================================
 // NABUNG (TABUNGAN)
@@ -70,6 +92,10 @@ app.post("/api/transaksi", authMiddleware, newTransaksi);
 // riwayat transaksi
 app.get("/api/transaksi", authMiddleware, historyTransaksi);
 
-app.listen(port, () => {
-  console.log(`App listening on port ${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`App listening on port ${port}`);
+  });
+}
+
+export default app;
