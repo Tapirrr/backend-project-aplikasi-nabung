@@ -102,33 +102,6 @@ export async function getAllUsers(req: AuthRequest, res: Response) {
   }
 }
 
-export async function uploadProfile(req: AuthRequest, res: Response) {
-  try {
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ message: "File gambar wajib diupload! (key: image)" });
-    }
-
-    const imageUrl = await uploadToCloudinary(req.file.buffer);
-
-    await pool.execute("update users set profile_image = ? where id = ?", [
-      imageUrl,
-      req.user!.id,
-    ]);
-
-    res.status(200).json({
-      message: "Foto profil berhasil diupload!",
-      profile_image: imageUrl,
-    });
-  } catch (err: any) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ message: err.message || "Gagal upload foto profil" });
-  }
-}
-
 // ini buat hapus users (ADMIN ONLY)
 export async function deleteUser(req: AuthRequest, res: Response) {
   try {
@@ -147,56 +120,64 @@ export async function deleteUser(req: AuthRequest, res: Response) {
   }
 }
 
-// ini buat edit profile users
-export async function editUser (req: AuthRequest, res: Response) {
+// ini buat edit profile
+export async function editProfile(req: AuthRequest, res: Response) {
   try {
-    const targetId = Number(req.params.id);
+    const userId = req.user!.id;
 
-    if (req.user!.role !== "admin" && req.user!.id !== targetId) {
-      return res.status(403).json({ message: "Akses ditolak!" });
+    const [rows]: any = await pool.execute("SELECT * FROM users WHERE id = ?", [
+      userId,
+    ]);
+
+    if (!rows.length) {
+      return res.status(404).json({
+        message: "User tidak ditemukan!",
+      });
     }
 
-    const [exist]: any = await pool.execute(
-      "select * from users where id = ?",
-      [targetId],
-    );
-    if (!exist.length)
-      return res.status(404).json({ message: "User tidak ditemukan!" });
-
+    const user = rows[0];
     const { username, email, password } = req.body;
 
-    const newUsername = username || exist[0].username;
-    const newEmail = email || exist[0].email;
-    const newPassword = password || exist[0].password;
+    const newUsername = username || user.username;
+    const newEmail = email || user.email;
+    const newPassword = password || user.password;
+
+    let profileImage = user.profile_image;
+
+    if (req.file) {
+      profileImage = await uploadToCloudinary(req.file.buffer);
+    }
 
     await pool.execute(
-      "update users set username = ?, email = ?, password = ? where id = ?",
-      [newUsername, newEmail, newPassword, targetId],
+      `UPDATE users
+       SET username = ?,
+           email = ?,
+           password = ?,
+           profile_image = ?
+       WHERE id = ?`,
+      [newUsername, newEmail, newPassword, profileImage, userId],
     );
 
-    res
-      .status(200)
-      .json({
-        message: "User berhasil diupdate!",
-        data: { id: targetId, username: newUsername, email: newEmail },
+    return res.status(200).json({
+      message: "Profil berhasil diupdate!",
+      data: {
+        id: userId,
+        username: newUsername,
+        email: newEmail,
+        profile_image: profileImage,
+      },
+    });
+  } catch (err: any) {
+    console.error(err);
+
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        message: "Username atau email sudah digunakan!",
       });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }}
-
-export async function getMyProfile(req: AuthRequest, res: Response) {
-  try {
-    const [rows]: any = await pool.execute(
-      "select id, username, email, role, profile_image from users where id = ?",
-      [req.user!.id],
-    );
-    if (!rows.length) {
-      return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ message: "User profile fetched!", data: rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(500).json({
+      message: "Gagal mengupdate profil",
+    });
   }
 }

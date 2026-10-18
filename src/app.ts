@@ -7,12 +7,12 @@ import { authMiddleware } from "./middlewares/authMiddleware.ts";
 import { adminMiddleware } from "./middlewares/adminMiddleware.ts";
 import type { AuthRequest } from "./middlewares/authMiddleware.ts";
 import { uploadToCloudinary } from "./db/cloudinary.ts";
-import { deleteUser, editUser, getAllUsers, login, register, uploadProfile } from "./controllers/userController.ts";
+import { deleteUser, editProfile, getAllUsers, login, register, } from "./controllers/userController.ts";
 import { deleteTabungan, detailTabungan, editTabungan, getAllTabungan, newTabungan } from "./controllers/nabungController.ts";
 import { historyTransaksi, newTransaksi } from "./controllers/transaksiController.ts";
 
 const app: Express = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 
 app.use(express.json());
 
@@ -35,14 +35,11 @@ app.post("/api/login", login);
 // admin: semua user, user biasa: cuma dirinya sendiri
 app.get("/api/users", authMiddleware, getAllUsers);
 
-// upload foto profil ke cloudinary
-app.post("/api/users/upload-profile", authMiddleware, upload.single("image"), uploadProfile);
-
 // hapus user, harus admin
 app.delete("/api/users/:id", authMiddleware, adminMiddleware, deleteUser);
 
 // edit profil user (username, email, password) - hanya diri sendiri atau admin
-app.put("/api/users/:id", authMiddleware, editUser);
+app.put("/api/users/profile", authMiddleware, upload.single("image"), editProfile);
 
 // =====================================================================
 // NABUNG (TABUNGAN)
